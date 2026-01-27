@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Entropy Generator</title>
+    <style>
+        :root { --primary: #2563eb; --bg: #f8fafc; --card: #ffffff; --text: #1e293b; --danger: #ef4444; --success: #22c55e; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); padding: 15px; max-width: 600px; margin: 0 auto; }
+        .card { background: var(--card); padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        label { display: block; font-weight: 600; margin: 15px 0 5px 0; font-size: 0.9rem; }
+        input, textarea, select { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+        .custom-file-upload { border: 2px dashed #cbd5e1; display: block; padding: 25px; text-align: center; cursor: pointer; border-radius: 8px; background: #f1f5f9; color: var(--primary); font-weight: bold; }
+        button { background: var(--primary); color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; margin-top: 10px; }
+        button:disabled { background: #94a3b8; }
+        .result-box { background: #1e293b; color: #bef264; padding: 15px; border-radius: 8px; word-break: break-all; margin-top: 10px; font-family: monospace; font-size: 1.2rem; text-align: center; }
+        .entropy-bar { height: 8px; background: #e2e8f0; border-radius: 4px; margin: 10px 0; overflow: hidden; }
+        .entropy-fill { height: 100%; width: 0%; transition: width 0.3s; }
+        .hidden { display: none; }
+        .char-preview { font-size: 0.75rem; color: #64748b; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+    <h2>📸 Entropy & Password Lab</h2>
+
+    <div class="card">
+        <label>1. Source Image (Camera)</label>
+        <label for="imageInput" class="custom-file-upload" id="uploadLabel">Capture Image</label>
+        <input type="file" id="imageInput" accept="image/*" capture="environment" style="display:none">
+        <div class="entropy-bar"><div id="entropyBar" class="entropy-fill"></div></div>
+        <div id="entropyStatus" style="font-size: 0.8rem;">Ready.</div>
+
+        <label>2. Manual Seed / Salt</label>
+        <input type="text" id="seed" placeholder="And / or manual entropy...">
+		<div id="saltEntropy" class="entropy-status" style="color:#94a3b8">Salt Entropy: 0 bits</div>
+        <div id="usagePrompt" class="usage-prompts" >Upload Image or add >513bits of Salt to generate Hash.</div>
+        <button id="calcBtn" disabled>Generate SHA-512 Hash</button>
+    </div>
+
+    <div class="card hidden" id="outputCard">
+        <h3>Generated Password</h3>
+		<div class="warning-box">
+            <strong>CRITICAL:</strong> If used for high-security passwords, <strong>securely delete the photo</strong> from your gallery and "Recently Deleted" folder immediately after use.
+        </div>
+        
+        <label>Alphabet Settings</label>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div>
+                <input type="checkbox" id="useUpper" checked> A-Z
+            </div>
+            <div>
+                <input type="checkbox" id="useLower" checked> a-z
+            </div>
+            <div>
+                <input type="checkbox" id="useNumbers" checked> 0-9
+            </div>
+        </div>
+
+        <label>Special Characters (Edit to exclude)</label>
+        <input type="text" id="specialChars" value="!@#$%^&*()">
+        <div class="char-preview" id="totalCharsetCount">Base: 72</div>
+
+        <label>Length</label>
+        <input type="number" id="lengthInput" value="16">
+
+        <div id="resultDisplay" class="result-box">---</div>
+        <button onclick="updateDisplay()">Refresh Encoding</button>
+
+        <hr style="margin:25px 0; border:0; border-top:1px solid #eee;">
+
+        <h3>Modulo Picker (Random Choice)</h3>
+        <label>Option A: Enter Number (Select 1 from N)</label>
+        <input type="number" id="modMax" placeholder="Example: 100">
+        
+        <label>Option B: Or Enter List (Comma separated)</label>
+        <textarea id="moduloOptions" rows="2" placeholder="Coffee, Tea, Water"></textarea>
+        
+        <button onclick="calculateModulo()" style="background:#475569;">Pick Random</button>
+        <div id="moduloResult" class="result-box" style="color: #60a5fa; font-size: 1rem;">---</div>
+    </div>
+
+<script>
+    let imageBuffer = null;
+    let currentBigIntHash = null;
+    const ENTROPY_MIN = 3.5;
+	let saltBits = 0;
+    const SALT_ONLY_THRESHOLD = 513;
+
+    // Elements
+    const fileInput = document.getElementById('imageInput');
+    const entropyBar = document.getElementById('entropyBar');
+    const calcBtn = document.getElementById('calcBtn');
+    const resultDisplay = document.getElementById('resultDisplay');
+	const seedInput = document.getElementById('seed');
+	const usagePrompt = document.getElementById('usagePrompt');
+	
+	seedInput.addEventListener('input', () => {
+        const val = seedInput.value.replace(/[^a-zA-Z]/g, "");
+        saltBits = val.length * Math.log2(26);
+        document.getElementById('saltEntropy').innerText = `Salt Entropy: ${Math.floor(saltBits)} bits`;
+        checkReadiness();
+    });
+	
+	function checkReadiness() {
+        if (imageBuffer || saltBits >= SALT_ONLY_THRESHOLD) {
+            calcBtn.disabled = false;
+            calcBtn.innerText = "Generate SHA-512 Hash";
+        } else {
+            calcBtn.disabled = true;
+            usagePrompt.innerText = "Add Image or more Salt";
+        }
+    }
+	
+
+    fileInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        document.getElementById('uploadLabel').innerText = "Processing...";
+        
+        const arrayBuffer = await file.arrayBuffer();
+        imageBuffer = arrayBuffer;
+        
+        const img = new Image();
+        img.onload = () => analyze(img);
+        img.src = URL.createObjectURL(new Blob([arrayBuffer]));
+    });
+
+    function analyze(img) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 64; canvas.height = 64;
+        ctx.drawImage(img, 0, 0, 64, 64);
+        const data = ctx.getImageData(0,0,64,64).data;
+        
+        const freq = new Array(256).fill(0);
+        for(let i=0; i<data.length; i+=4) { freq[data[i]]++; freq[data[i+1]]++; freq[data[i+2]]++; }
+        
+        let h = 0;
+        const total = 64 * 64 * 3;
+        for(let f of freq) if(f > 0) { const p = f/total; h -= p * Math.log2(p); }
+
+        const pct = (h/8)*100;
+        entropyBar.style.width = pct + "%";
+        entropyBar.style.background = h < ENTROPY_MIN ? "var(--danger)" : "var(--success)";
+        document.getElementById('entropyStatus').innerText = `Entropy: ${h.toFixed(2)} bits/byte`;
+        calcBtn.disabled = h < ENTROPY_MIN;
+        document.getElementById('uploadLabel').innerText = "Image Loaded";
+    }
+
+
+    calcBtn.addEventListener('click', async () => {
+        const time = new TextEncoder().encode(Date.now().toString());
+        const seed = new TextEncoder().encode(document.getElementById('seed').value);
+        
+        let combined;
+        if (imageBuffer) {
+            combined = new Uint8Array(time.length + seed.length + imageBuffer.byteLength);
+            combined.set(time);
+            combined.set(seed, time.length);
+            combined.set(new Uint8Array(imageBuffer), time.length + seed.length);
+        } else {
+            // Salt-only mode (no image)
+            combined = new Uint8Array(time.length + seed.length);
+            combined.set(time);
+            combined.set(seed, time.length);
+        }
+
+        const hash = await crypto.subtle.digest('SHA-512', combined);
+        currentBigIntHash = BigInt('0x' + Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join(''));
+        
+        document.getElementById('outputCard').classList.remove('hidden');
+        updateDisplay();
+    });
+
+    function updateDisplay() {
+        if (!currentBigIntHash) return;
+        
+        let charset = "";
+        if(document.getElementById('useLower').checked) charset += "abcdefghijklmnopqrstuvwxyz";
+        if(document.getElementById('useUpper').checked) charset += "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        if(document.getElementById('useNumbers').checked) charset += "0123456789";
+        charset += document.getElementById('specialChars').value;
+
+        document.getElementById('totalCharsetCount').innerText = `Base: ${charset.length}`;
+        
+        const len = parseInt(document.getElementById('lengthInput').value);
+        let result = "";
+        let tempHash = currentBigIntHash;
+        const base = BigInt(charset.length || 1);
+
+        for(let i=0; i<len; i++) {
+            result += charset[Number(tempHash % base)];
+            tempHash /= base;
+        }
+        resultDisplay.innerText = result;
+    }
+
+    function calculateModulo() {
+        if (!currentBigIntHash) return;
+        const modMax = document.getElementById('modMax').value;
+        const listText = document.getElementById('moduloOptions').value;
+        
+        let options = [];
+        if (modMax) {
+            const n = parseInt(modMax);
+            for(let i=1; i<=n; i++) options.push(i);
+        } else if (listText) {
+            options = listText.split(',').map(s => s.trim()).filter(s => s !== "");
+        }
+
+        if (options.length === 0) return;
+        const index = Number(currentBigIntHash % BigInt(options.length));
+        document.getElementById('moduloResult').innerText = options[index];
+    }
+</script>
+</body>
+</html>
