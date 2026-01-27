@@ -12,15 +12,13 @@ I like the philosophical idea of making a truely random choice driven by the nea
 3.  **Temporal Noise**: Millisecond-precision timestamp to prevent identical state collisions.
 4.  The Goal of the Process is to make it harder for an Attacker to break the PW creation process (using >500bits of entropy) than breaking the password itself by brute force, as passwords are only roughly 100bits of entropy. -> use a sufficient salt. 
 
-
-
 ### SHA-512 Distillation
 We collect megabytes of raw data and "distill" it using the **SHA-512** cryptographic hash. This ensures that:
 * Even if an attacker recreates 99.9% of the photo, the **Avalanche Effect** of SHA-512 ensures the output is 100% different.
 * The final 512-bit seed is uniformly distributed. Therefore only brute forcable. 
 
 ## The "Ghost Image" Risk
-The biggest flaw in any image-based generator is the **source file persistence**. If the original image is saved to your gallery or cloud backup, the "True Randomness" becomes "Stored Data." To mitigate this to some extend we use the timestamp and the salt. 
+The biggest flaw in any image-based generator is the **source file persistence**. If the original image is saved to your gallery or cloud backup, the "True Randomness" becomes "Stored Data." To mitigate this to some extend we use the timestamp and the salt.
 
 **Protocol for High Security:**
 * Immediately delete the photo after generation.
@@ -34,6 +32,7 @@ The biggest flaw in any image-based generator is the **source file persistence**
 
 ##  How to Use
 Simply save the `.html` file to your device. Open it in any modern mobile browser. No internet connection is required after the initial load.
+Alternatively go to https://nicolai-wachenschwan.github.io/Image2password/ where the file is also hosted. 
 
 ## Notes
 Implementation was mostly done by Gemini 3, with a human touch here an there. 
