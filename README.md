@@ -4,11 +4,13 @@ How do you locally create true random Numbers on a Computer? Harvest randomness 
 ##  Security Philosophy
 
 Why? Dont we use Libarys for that? Yes, but I like the idea of calculating something truely random on a computer, by harvesting the surrounding. Most "random" generators are purely mathematical (PRNGs). While usual approaches harvest mouse movements or some other scource of entropy **image2password** bridges the gap between software and physics by using your smartphone's camera as a **True Random Number Generator (TRNG)**.
+I like the philosophical idea of making a truely random choice driven by the near enviroment, thats why this is also impemented, even though it might be a bit overkill to harvest megabits of entropy to decide between sushi or pizza :)
 
 ### The Entropy Pool
 1.  **image**: Every digital image contains "Shot Noise" and "Thermal Noise." Even if you restage a photo, the specific energy state of the sensor pixels at the nanosecond of capture is unique. We estimate ~1 bit of true, un-stageable entropy per pixel.
 2.  **Salt (User Input)**: Provides a secondary entropy layer. If the salt length provides >513 bits of entropy (approx. 110 random letters), the tool allows image-free generation.
-3.  **Temporal Noise**: Millisecond-precision timestamp to prevent identical state collisions. 
+3.  **Temporal Noise**: Millisecond-precision timestamp to prevent identical state collisions.
+4.  The Goal of the Process is to make it harder for an Attacker to break the PW creation process (using >500bits of entropy) than breaking the password itself by brute force, as passwords are only roughly 100bits of entropy. -> use a sufficient salt. 
 
 
 
